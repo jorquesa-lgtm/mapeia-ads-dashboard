@@ -110,6 +110,33 @@
     .funnel{grid-template-columns:1fr;gap:14px}
     .fstage+.fstage{border-left:none;border-top:1px solid var(--border);padding-top:14px}
   }
+
+  /* smart insights */
+  .insights-btn{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;letter-spacing:.03em;color:var(--bg);background:var(--accent);border:none;padding:6px 12px;border-radius:8px;cursor:pointer;transition:.15s}
+  .insights-btn:hover{filter:brightness(1.08)}
+  .insights{padding:18px;margin-bottom:16px;border-color:rgba(194,242,74,.35)}
+  .ins-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+  .ins-head .t{font-family:'Bricolage Grotesque',sans-serif;font-size:16px;font-weight:700}
+  .ins-head .s{font-family:'IBM Plex Mono',monospace;color:var(--dim);font-size:11px;margin-top:2px}
+  .ins-loading{font-family:'IBM Plex Mono',monospace;color:var(--dim);font-size:13px;display:flex;align-items:center;gap:10px;padding:16px 2px}
+  .spin{width:14px;height:14px;border:2px solid var(--grid);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ins-headline{font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:700;color:var(--accent);line-height:1.35;margin-bottom:10px}
+  .ins-diag{font-size:13.5px;color:var(--text);line-height:1.6;margin-bottom:16px}
+  .recs{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+  .rec{border:1px solid var(--border);border-left:3px solid var(--dim);border-radius:10px;padding:12px 14px;background:rgba(255,255,255,.012)}
+  .rec.hi{border-left-color:var(--down)} .rec.md{border-left-color:var(--warn)} .rec.lo{border-left-color:var(--mint)}
+  .rec-top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+  .pri{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;padding:2px 6px;border-radius:4px;font-weight:600}
+  .pri.hi{background:rgba(255,122,107,.16);color:var(--down)} .pri.md{background:rgba(255,194,75,.16);color:var(--warn)} .pri.lo{background:rgba(124,242,208,.14);color:var(--mint)}
+  .rec-title{font-weight:600;font-size:13.5px}
+  .rec-why{color:var(--dim);font-size:12.5px;line-height:1.55;margin-bottom:6px}
+  .rec-act{color:var(--mint);font-size:12.5px;line-height:1.5;font-family:'IBM Plex Mono',monospace}
+  .ins-watch ul{margin:4px 0 0 16px;color:var(--dim);font-size:12.5px;line-height:1.7}
+  .ins-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;padding-top:12px;border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint)}
+  .ins-disc{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--faint);margin-top:8px}
+  .ins-raw{white-space:pre-wrap;font-size:13px;color:var(--text);line-height:1.6}
+  .ins-err{color:var(--down);font-size:13px;padding:10px 2px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -119,6 +146,7 @@
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
         <h1 class="disp">Ads Performance</h1>
         <span class="pill" id="modeBadge">Loading…</span>
+        <button class="insights-btn" id="insightsBtn">✦ Smart Insights</button>
       </div>
       <div class="num" style="color:var(--dim);font-size:12.5px" id="rangeLabel">Google Ads + Meta</div>
     </div>
@@ -139,6 +167,8 @@
       </div>
     </div>
   </header>
+
+  <div class="panel insights" id="insightsPanel" style="display:none"></div>
 
   <div class="demobar" id="demobar">&#9888; DEMO DATA — these are illustrative sample numbers, NOT your live ad account. Use the button to return to live data.
     <button class="seg" id="backLiveBtn" style="margin-left:auto;font-size:11.5px">Try live again</button>
@@ -516,6 +546,77 @@ async function boot(){
     showError(err.message||String(err));
   }
 }
+// ---------- Smart Insights ----------
+const INSIGHTS_ENDPOINT = CONFIG.DATA_ENDPOINT.replace("ads-dashboard-data","ads-insights");
+let insightsLoading=false;
+const insEsc=s=>String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+const priClass=p=>{p=(p||"").toLowerCase();return p.startsWith("alt")||p.startsWith("hi")?"hi":p.startsWith("med")||p.startsWith("mé")?"md":"lo";};
+const priLabel=p=>{const c=priClass(p);return c==="hi"?"ALTA":c==="md"?"MÉDIA":"BAIXA";};
+
+function insShell(inner){
+  return `<div class="ins-head">
+      <div><div class="t">✦ Smart Insights</div><div class="s">Análise de diretor(a) sênior de mídia · com base nos seus dados ao vivo</div></div>
+      <button class="seg" id="insClose" style="font-size:12px">Fechar</button>
+    </div>${inner}`;
+}
+function insClose(){ const p=document.getElementById("insightsPanel"); const b=document.getElementById("insClose"); if(b) b.addEventListener("click",()=>{p.style.display="none";}); }
+
+function openInsights(refresh){
+  const p=document.getElementById("insightsPanel");
+  p.style.display="block";
+  p.scrollIntoView({behavior:"smooth",block:"nearest"});
+  if(insightsLoading) return;
+  insightsLoading=true;
+  p.innerHTML=insShell(`<div class="ins-loading"><span class="spin"></span> Analisando suas campanhas… isso leva alguns segundos.</div>`);
+  insClose();
+  const u=INSIGHTS_ENDPOINT+(INSIGHTS_ENDPOINT.includes("?")?"&":"?")+"from="+FROM+"&to="+TO+"&budget="+(CONFIG.DAILY_BUDGET||50)+(refresh?"&refresh=1":"");
+  const h={}; if(CONFIG.ACCESS_TOKEN) h.Authorization="Bearer "+CONFIG.ACCESS_TOKEN;
+  fetch(u,{headers:h}).then(r=>r.json())
+    .then(d=>{ insightsLoading=false; renderInsights(d); })
+    .catch(e=>{ insightsLoading=false; renderInsights({error:"network",message:e.message||String(e)}); });
+}
+
+function renderInsights(d){
+  const p=document.getElementById("insightsPanel");
+  if(d && d.error){
+    const m = d.error==="ai_not_configured" ? "A chave ANTHROPIC_API_KEY não está configurada no Supabase."
+          : d.error==="rate_limited" ? (d.message||"Limite por hora atingido. Tente em instantes.")
+          : d.error==="ai_error" ? ("A IA retornou um erro ("+(d.status||"")+"). "+(d.detail||""))
+          : (d.message||d.detail||"Não foi possível gerar agora.");
+    p.innerHTML=insShell(`<div class="ins-err">${insEsc(m)}</div>
+      <div class="ins-foot"><span></span><button class="seg" id="insRefresh" style="font-size:11.5px">Tentar de novo</button></div>`);
+    insClose();
+    const rb=document.getElementById("insRefresh"); if(rb) rb.addEventListener("click",()=>openInsights(true));
+    return;
+  }
+  const s=d.structured; let body="";
+  if(s){
+    const recs=(s.recommendations||[]).map(r=>`
+      <div class="rec ${priClass(r.priority)}">
+        <div class="rec-top"><span class="pri ${priClass(r.priority)}">${priLabel(r.priority)}</span><span class="rec-title">${insEsc(r.title)}</span></div>
+        ${r.rationale?`<div class="rec-why">${insEsc(r.rationale)}</div>`:""}
+        ${r.action?`<div class="rec-act">→ ${insEsc(r.action)}</div>`:""}
+      </div>`).join("");
+    const watch=(s.watch||[]).map(w=>`<li>${insEsc(w)}</li>`).join("");
+    body=`${s.headline?`<div class="ins-headline">${insEsc(s.headline)}</div>`:""}
+      ${s.diagnosis?`<div class="ins-diag">${insEsc(s.diagnosis)}</div>`:""}
+      <div class="recs">${recs}</div>
+      ${watch?`<div class="ins-watch"><div class="lbl" style="margin-bottom:6px">Monitorar a seguir</div><ul>${watch}</ul></div>`:""}`;
+  } else {
+    body=`<div class="ins-raw">${insEsc(d.raw||"Sem conteúdo retornado.")}</div>`;
+  }
+  const when=d.generated_at? new Date(d.generated_at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"";
+  const foot=`<div class="ins-foot">
+      <span>${d.cached?"em cache":"gerado"}${when?(" · "+when):""}${d.model?(" · "+insEsc(d.model)):""}${d.rate_limited?" · limite/hora":""}</span>
+      <button class="seg" id="insRefresh" style="font-size:11.5px">Atualizar análise</button>
+    </div>
+    <div class="ins-disc">Sugestões geradas por IA com base nos seus números ao vivo. Use seu julgamento antes de aplicar.</div>`;
+  p.innerHTML=insShell(body+foot);
+  insClose();
+  const rb=document.getElementById("insRefresh"); if(rb) rb.addEventListener("click",()=>openInsights(true));
+}
+document.getElementById("insightsBtn").addEventListener("click",()=>openInsights(false));
+
 function initRange(){
   const t=new Date(); TO=ymd(t);
   const f=new Date(t); f.setDate(f.getDate()-29); FROM=ymd(f);

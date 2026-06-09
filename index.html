@@ -45,6 +45,8 @@
   .range .seg{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--dim);background:transparent;border:1px solid var(--border);padding:5px 11px;border-radius:8px;cursor:pointer;transition:.15s}
   .range .seg:hover{color:var(--text)}
   .range .seg.on{color:var(--bg);background:var(--text);border-color:var(--text);font-weight:600}
+  .dateinp{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:5px 7px;color-scheme:dark}
+  .dateinp:focus{outline:none;border-color:var(--mint)}
   .synced{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint)}
 
   .demobar{display:none;align-items:center;gap:10px;padding:11px 16px;border:1px solid var(--warn);background:rgba(255,194,75,.10);border-radius:12px;margin-bottom:16px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--warn)}
@@ -122,9 +124,12 @@
     </div>
     <div class="hdr-right">
       <div class="range" id="rangeSegs">
-        <span class="lbl" style="margin-right:4px">Range</span>
+        <span class="lbl" style="margin-right:2px">From</span>
+        <input type="date" id="fromDate" class="dateinp" />
+        <span class="lbl">To</span>
+        <input type="date" id="toDate" class="dateinp" />
         <button class="seg" data-d="7">7d</button>
-        <button class="seg on" data-d="30">30d</button>
+        <button class="seg" data-d="30">30d</button>
         <button class="seg" data-d="90">90d</button>
       </div>
       <div class="legend">
@@ -220,9 +225,11 @@ const COL  = getComputedStyle(document.documentElement);
 const c = k => COL.getPropertyValue(k).trim();
 
 // ---------- state ----------
-let RANGE = 30;
+let FROM=null, TO=null;
 let LEADS_TOTAL = 0, LEADS_BY_DAY = [], LAST_SYNCED = null;
 let trendChart, donutChart, ROWS = [], DAILY = [];
+const ymd = d => { const x=new Date(d); return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+const rangeDays = () => { if(FROM&&TO){ const a=Date.parse(FROM+"T00:00:00"), b=Date.parse(TO+"T00:00:00"); if(Number.isFinite(a)&&Number.isFinite(b)) return Math.max(1,Math.round((b-a)/864e5)+1);} return 30; };
 
 // ---------- sample data (explicit DEMO only — never shown silently) ----------
 function mulberry32(a){return function(){a|=0;a=(a+0x6d2b79f5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
@@ -234,10 +241,10 @@ const CAMPAIGNS=[
   {name:"Performance Max · Geral",platform:"google",spend:10,cpc:1.80,ctr:.030,cvr:.020},
 ];
 function sampleRows(){
-  const rnd=mulberry32(20260607),rows=[],end=new Date();
-  for(let d=RANGE-1;d>=0;d--){
+  const rnd=mulberry32(20260607),rows=[],end=TO?new Date(TO+"T00:00:00"):new Date(),n=rangeDays();
+  for(let d=n-1;d>=0;d--){
     const day=new Date(end);day.setDate(end.getDate()-d);
-    const iso=day.toISOString().slice(0,10),dow=day.getDay(),weekend=(dow===0||dow===6)?.78:1;
+    const iso=ymd(day),dow=day.getDay(),weekend=(dow===0||dow===6)?.78:1;
     for(const k of CAMPAIGNS){
       const noise=.72+rnd()*.56, spend=+(k.spend*noise*weekend).toFixed(2);
       const cpc=k.cpc*(.9+rnd()*.25), clicks=Math.max(0,Math.round(spend/cpc));
@@ -253,7 +260,7 @@ async function loadLive(){
   const base=CONFIG.DATA_ENDPOINT;
   if(!base) throw new Error("No DATA_ENDPOINT configured");
   const h={}; if(CONFIG.ACCESS_TOKEN) h.Authorization="Bearer "+CONFIG.ACCESS_TOKEN;
-  const r=await fetch(base+(base.includes("?")?"&":"?")+"v=2&days="+RANGE,{headers:h});
+  const r=await fetch(base+(base.includes("?")?"&":"?")+"v=2&from="+FROM+"&to="+TO,{headers:h});
   if(!r.ok) throw new Error("Endpoint returned "+r.status);
   const data=await r.json();
   if(data && data.error) throw new Error(data.error);
@@ -286,13 +293,13 @@ function render(rows,isDemo){
 
   const dates=[...new Set(rows.map(r=>r.date))].sort();
   const total=agg(rows);
-  const nDays=dates.length||RANGE;
+  const nDays=dates.length||rangeDays();
   const leads=isDemo?Math.round(total.conversions):LEADS_TOTAL;
 
   // range + synced labels
-  if(dates.length){
-    const f=s=>s.slice(5).replace("-","/");
-    document.getElementById("rangeLabel").textContent="Google Ads + Meta · "+f(dates[0])+" – "+f(dates[dates.length-1]);
+  {
+    const f=s=>s?s.slice(5).replace("-","/"):"";
+    document.getElementById("rangeLabel").textContent="Google Ads + Meta · "+f(FROM)+" – "+f(TO);
   }
   const syncEl=document.getElementById("synced");
   if(isDemo){ syncEl.textContent="demo • not synced"; }
@@ -440,12 +447,24 @@ document.getElementById("metricSegs").addEventListener("click",e=>{
   b.classList.add("on"); if(typeof Chart!=="undefined") drawTrend(b.dataset.m);
 });
 
-// range selector -> reload live
+// presets set the from/to inputs, then reload
 document.getElementById("rangeSegs").addEventListener("click",e=>{
   const b=e.target.closest(".seg"); if(!b) return;
+  const n=parseInt(b.dataset.d,10)||30;
+  const t=new Date(); TO=ymd(t);
+  const f=new Date(t); f.setDate(f.getDate()-(n-1)); FROM=ymd(f);
+  document.getElementById("fromDate").value=FROM;
+  document.getElementById("toDate").value=TO;
   document.querySelectorAll("#rangeSegs .seg").forEach(x=>x.classList.remove("on"));
-  b.classList.add("on"); RANGE=parseInt(b.dataset.d,10)||30; boot();
+  b.classList.add("on"); boot();
 });
+// custom date inputs -> reload
+["fromDate","toDate"].forEach(id=>document.getElementById(id).addEventListener("change",()=>{
+  const fv=document.getElementById("fromDate").value, tv=document.getElementById("toDate").value;
+  if(fv) FROM=fv; if(tv) TO=tv;
+  document.querySelectorAll("#rangeSegs .seg").forEach(x=>x.classList.remove("on"));
+  boot();
+}));
 
 document.getElementById("backLiveBtn").addEventListener("click",boot);
 
@@ -497,6 +516,14 @@ async function boot(){
     showError(err.message||String(err));
   }
 }
+function initRange(){
+  const t=new Date(); TO=ymd(t);
+  const f=new Date(t); f.setDate(f.getDate()-29); FROM=ymd(f);
+  const fi=document.getElementById("fromDate"), ti=document.getElementById("toDate");
+  if(fi){ fi.value=FROM; fi.max=TO; }
+  if(ti){ ti.value=TO; ti.max=TO; }
+}
+initRange();
 boot();
 </script>
 </body>

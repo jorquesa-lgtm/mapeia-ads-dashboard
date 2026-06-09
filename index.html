@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ads Performance · Google + Meta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+<style>
+  :root{
+    --meta:#4C8DFF; --google:#F4B740; --accent:#C2F24A; --mint:#7CF2D0;
+    --text:#E8ECF1; --dim:#8A93A2; --faint:#5A6271;
+    --panel:#12161C; --panel2:#161B22; --bg:#0B0E12; --grid:#1E242C; --border:#222932;
+    --up:#9BE15A; --down:#FF7A6B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'IBM Plex Sans',sans-serif;color:var(--text);
+    background:
+      radial-gradient(900px 520px at 85% -12%, rgba(76,141,255,.10), transparent 60%),
+      radial-gradient(720px 520px at -6% 112%, rgba(244,183,64,.08), transparent 55%),
+      var(--bg);
+    min-height:100vh;padding:30px;
+  }
+  .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+  .disp{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.02em}
+  .lbl{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .wrap{max-width:1280px;margin:0 auto}
+  .panel{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--border);border-radius:16px}
+
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;margin-bottom:22px}
+  h1{font-size:30px;font-weight:800;line-height:1}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--bg);background:var(--accent);padding:4px 10px;border-radius:999px;font-weight:600}
+  .pill.live{background:var(--mint)}
+  .legend{display:flex;gap:18px;align-items:center}
+  .leg{display:flex;align-items:center;gap:7px}
+  .sw{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+  .kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:8px}
+  .kpi{padding:16px 16px 14px}
+  .kpi .v{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:21px;font-weight:600;margin:10px 0 9px}
+  .chip{display:inline-flex;align-items:center;gap:3px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px}
+  .foot{font-family:'IBM Plex Mono',monospace;color:var(--faint);font-size:10.5px;margin-bottom:22px}
+
+  .row{display:grid;gap:14px;margin-bottom:14px}
+  .row.charts{grid-template-columns:1.85fr 1fr}
+  .row.two{grid-template-columns:1fr 1fr}
+  .ph{display:flex;justify-content:space-between;align-items:center;padding:18px 18px 8px}
+  .ph .t{font-family:'Bricolage Grotesque',sans-serif;font-size:15px;font-weight:700}
+  .ph .s{font-family:'IBM Plex Mono',monospace;color:var(--dim);font-size:11px;margin-top:2px}
+  .segs{display:flex;gap:6px}
+  .seg{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--dim);background:transparent;border:1px solid var(--border);padding:5px 11px;border-radius:8px;cursor:pointer;transition:.15s}
+  .seg:hover{color:var(--text)}
+  .seg.on{color:var(--bg);background:var(--text);border-color:var(--text);font-weight:600}
+  .chartbox{padding:6px 14px 16px;position:relative}
+  .donutwrap{position:relative;padding:6px 18px 12px;height:230px}
+  .donutctr{position:absolute;inset:6px 18px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+  .share{display:flex;flex-direction:column;gap:8px;padding:0 18px 18px}
+  .share .r{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:9px;vertical-align:middle}
+
+  .pcard{padding:18px}
+  .pcard .h{display:flex;align-items:center;gap:9px;margin-bottom:16px}
+  .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .pgrid .v{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600}
+
+  table{width:100%;border-collapse:collapse}
+  th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:500}
+  th:first-child{text-align:left}
+  td{padding:13px 14px;border-bottom:1px solid rgba(34,41,50,.6);font-size:13px;text-align:right}
+  td:first-child{text-align:left}
+  td.num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover td{background:rgba(255,255,255,.015)}
+
+  @media(max-width:1080px){
+    .kpis{grid-template-columns:repeat(4,1fr)}
+    .row.charts,.row.two{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        <h1 class="disp">Ads Performance</h1>
+        <span class="pill" id="modeBadge">Sample data</span>
+      </div>
+      <div class="num" style="color:var(--dim);font-size:12.5px" id="rangeLabel">Google Ads + Meta</div>
+    </div>
+    <div class="legend">
+      <div class="leg"><span class="sw" style="background:var(--meta)"></span><span class="num" style="font-size:12px;color:var(--dim)">Meta</span></div>
+      <div class="leg"><span class="sw" style="background:var(--google)"></span><span class="num" style="font-size:12px;color:var(--dim)">Google</span></div>
+    </div>
+  </header>
+
+  <div id="emptyView" style="display:none"></div>
+  <div id="dataView">
+  <div class="kpis" id="kpis"></div>
+  <div class="foot">* Conversions and CPA are reported by each ad platform. True CAC / ROAS unlock once UTM capture + revenue are joined from Supabase.</div>
+
+  <div class="row charts">
+    <div class="panel">
+      <div class="ph">
+        <div>
+          <div class="t">Daily spend by platform</div>
+          <div class="s" id="trendSub">vs. clicks (line)</div>
+        </div>
+        <div class="segs" id="metricSegs">
+          <button class="seg on" data-m="clicks">Clicks</button>
+          <button class="seg" data-m="conversions">Conversions</button>
+          <button class="seg" data-m="ctr">CTR %</button>
+        </div>
+      </div>
+      <div class="chartbox"><canvas id="trend" height="135"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><div><div class="t">Spend share</div><div class="s">where the budget went</div></div></div>
+      <div class="donutwrap">
+        <canvas id="donut"></canvas>
+        <div class="donutctr"><div class="lbl">Total</div><div class="num" id="donutTotal" style="font-size:19px;font-weight:600"></div></div>
+      </div>
+      <div class="share" id="share"></div>
+    </div>
+  </div>
+
+  <div class="row two" id="platformCards"></div>
+
+  <div class="panel" style="overflow:hidden">
+    <div class="ph"><div class="t">Campaign breakdown</div><div class="num" id="campCount" style="color:var(--accent);font-size:11.5px"></div></div>
+    <table>
+      <thead><tr><th>Campaign</th><th>Spend</th><th>Impr.</th><th>Clicks</th><th>CTR</th><th>CPC</th><th>Conv.*</th><th>CPA*</th></tr></thead>
+      <tbody id="campBody"></tbody>
+    </table>
+  </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — going live
+   Leave DATA_ENDPOINT empty to run on sample data.
+   To go live, deploy the Supabase Edge Function (ads-dashboard-data)
+   and paste its URL here. It must return an array of rows shaped:
+   [{ date:'YYYY-MM-DD', platform:'meta'|'google', campaign_name, spend, impressions, clicks, conversions }]
+   (RLS blocks a raw anon read of ad_metrics, which is why we read
+   through a service-role Edge Function rather than the table directly.)
+   ============================================================ */
+const CONFIG = {
+  DATA_ENDPOINT: "https://vaekdvwevooqrlubctoj.supabase.co/functions/v1/ads-dashboard-data",
+  ACCESS_TOKEN:  "mapeia_ads_dash_7f3a9c1e8b6d4205af19",
+};
+
+// ---------- formatters ----------
+const BRL  = n => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n||0);
+const BRL0 = n => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0}).format(n||0);
+const INT  = n => new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0}).format(n||0);
+const PCT  = n => (100*(n||0)).toFixed(2)+"%";
+const COL  = getComputedStyle(document.documentElement);
+const c = k => COL.getPropertyValue(k).trim();
+
+// ---------- sample data (mirrors ad_metrics row shape) ----------
+function mulberry32(a){return function(){a|=0;a=(a+0x6d2b79f5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+const CAMPAIGNS=[
+  {name:"Diagnóstico Gratuito · Interesses PME",platform:"meta",spend:14,cpc:1.10,ctr:.012,cvr:.015},
+  {name:"Remarketing · Visitantes do Site",platform:"meta",spend:7,cpc:.95,ctr:.020,cvr:.045},
+  {name:"Search · Diagnóstico Empresarial",platform:"google",spend:13,cpc:3.20,ctr:.052,cvr:.040},
+  {name:"Search · Consultoria para PMEs",platform:"google",spend:9,cpc:2.80,ctr:.045,cvr:.030},
+  {name:"Performance Max · Geral",platform:"google",spend:10,cpc:1.80,ctr:.030,cvr:.020},
+];
+function sampleRows(){
+  const rnd=mulberry32(20260607),rows=[],end=new Date("2026-06-07T00:00:00");
+  for(let d=29;d>=0;d--){
+    const day=new Date(end);day.setDate(end.getDate()-d);
+    const iso=day.toISOString().slice(0,10),dow=day.getDay(),weekend=(dow===0||dow===6)?.78:1;
+    for(const k of CAMPAIGNS){
+      const noise=.72+rnd()*.56, spend=+(k.spend*noise*weekend).toFixed(2);
+      const cpc=k.cpc*(.9+rnd()*.25), clicks=Math.max(0,Math.round(spend/cpc));
+      const impressions=Math.round(clicks/k.ctr), conversions=Math.round(clicks*k.cvr*(.5+rnd()));
+      rows.push({date:iso,platform:k.platform,campaign_name:k.name,spend,impressions,clicks,conversions});
+    }
+  }
+  return rows;
+}
+let LIVE=false;
+async function loadRows(){
+  if(CONFIG.DATA_ENDPOINT){
+    const h={}; if(CONFIG.ACCESS_TOKEN) h.Authorization="Bearer "+CONFIG.ACCESS_TOKEN;
+    const r=await fetch(CONFIG.DATA_ENDPOINT,{headers:h});
+    if(!r.ok) throw new Error("Endpoint "+r.status);
+    LIVE=true;
+    document.getElementById("modeBadge").textContent="Live";
+    document.getElementById("modeBadge").classList.add("live");
+    return await r.json();
+  }
+  return sampleRows();
+}
+
+// ---------- aggregation ----------
+function agg(rows){
+  const t=rows.reduce((a,r)=>({spend:a.spend+r.spend,impressions:a.impressions+r.impressions,clicks:a.clicks+r.clicks,conversions:a.conversions+r.conversions}),{spend:0,impressions:0,clicks:0,conversions:0});
+  t.ctr=t.impressions?t.clicks/t.impressions:0; t.cpc=t.clicks?t.spend/t.clicks:0;
+  t.cpm=t.impressions?(t.spend/t.impressions)*1000:0; t.cpa=t.conversions?t.spend/t.conversions:0;
+  return t;
+}
+
+let trendChart, donutChart, ROWS=[], DAILY=[];
+
+function render(rows){
+  ROWS=rows;
+  const dates=[...new Set(rows.map(r=>r.date))].sort();
+  const total=agg(rows);
+
+  // range label
+  if(dates.length){
+    const f=s=>s.slice(5).replace("-","/");
+    document.getElementById("rangeLabel").textContent="Google Ads + Meta · "+f(dates[0])+" – "+f(dates[dates.length-1])+" · 2026";
+  }
+
+  // deltas: recent half vs prior half
+  const mid=dates[Math.floor(dates.length/2)];
+  const recent=agg(rows.filter(r=>r.date>=mid)), prior=agg(rows.filter(r=>r.date<mid));
+  const dd=k=>prior[k]?(recent[k]-prior[k])/prior[k]:0;
+
+  // KPIs
+  const kpis=[
+    {label:"Spend",value:BRL(total.spend),d:dd("spend"),low:false},
+    {label:"Impressions",value:INT(total.impressions),d:dd("impressions"),low:false},
+    {label:"Clicks",value:INT(total.clicks),d:dd("clicks"),low:false},
+    {label:"CTR",value:PCT(total.ctr),d:dd("ctr"),low:false},
+    {label:"Avg. CPC",value:BRL(total.cpc),d:dd("cpc"),low:true},
+    {label:"Conversions*",value:INT(total.conversions),d:dd("conversions"),low:false},
+    {label:"CPA*",value:BRL(total.cpa),d:dd("cpa"),low:true},
+  ];
+  document.getElementById("kpis").innerHTML=kpis.map(m=>{
+    const flat=Math.abs(m.d)<.0005, pos=m.low?m.d<0:m.d>0;
+    const col=flat?"var(--dim)":pos?"var(--up)":"var(--down)";
+    const bg=flat?"rgba(138,147,162,.12)":pos?"rgba(155,225,90,.12)":"rgba(255,122,107,.12)";
+    const arrow=flat?"—":(pos?"▲":"▼")+" "+(m.d>0?"+":"")+(m.d*100).toFixed(1)+"%";
+    return `<div class="panel kpi"><div class="lbl">${m.label}</div><div class="v">${m.value}</div>
+      <span class="chip" style="color:${col};background:${bg}">${arrow}</span></div>`;
+  }).join("");
+
+  // platform split
+  const byP=["meta","google"].map(p=>{const a=agg(rows.filter(r=>r.platform===p));return{p,...a,share:total.spend?a.spend/total.spend:0};});
+
+  // platform cards
+  document.getElementById("platformCards").innerHTML=byP.map(p=>{
+    const color=p.p==="meta"?"var(--meta)":"var(--google)";
+    const cells=[["Spend",BRL0(p.spend)],["Clicks",INT(p.clicks)],["CTR",PCT(p.ctr)],["Avg. CPC",BRL(p.cpc)],["Conv.*",INT(p.conversions)],["CPA*",BRL(p.cpa)]];
+    return `<div class="panel pcard" style="border-top:2px solid ${color}">
+      <div class="h"><span class="sw" style="width:9px;height:9px;background:${color}"></span><span class="disp" style="font-size:16px;font-weight:700">${p.p==="meta"?"Meta Ads":"Google Ads"}</span></div>
+      <div class="pgrid">${cells.map(x=>`<div><div class="lbl" style="margin-bottom:6px">${x[0]}</div><div class="v">${x[1]}</div></div>`).join("")}</div></div>`;
+  }).join("");
+
+  // campaign table
+  const camps=Object.values(rows.reduce((m,r)=>{
+    (m[r.campaign_name]??(m[r.campaign_name]={campaign_name:r.campaign_name,platform:r.platform,spend:0,impressions:0,clicks:0,conversions:0}));
+    const o=m[r.campaign_name]; o.spend+=r.spend;o.impressions+=r.impressions;o.clicks+=r.clicks;o.conversions+=r.conversions; return m;
+  },{})).map(o=>({...o,ctr:o.impressions?o.clicks/o.impressions:0,cpc:o.clicks?o.spend/o.clicks:0,cpa:o.conversions?o.spend/o.conversions:0})).sort((a,b)=>b.spend-a.spend);
+  document.getElementById("campCount").textContent=camps.length+" campaigns ↗";
+  document.getElementById("campBody").innerHTML=camps.map(o=>{
+    const color=o.platform==="meta"?"var(--meta)":"var(--google)";
+    return `<tr><td><span class="dot" style="background:${color}"></span>${o.campaign_name}</td>
+      <td class="num">${BRL0(o.spend)}</td><td class="num" style="color:var(--dim)">${INT(o.impressions)}</td>
+      <td class="num">${INT(o.clicks)}</td><td class="num" style="color:var(--dim)">${PCT(o.ctr)}</td>
+      <td class="num">${BRL(o.cpc)}</td><td class="num">${INT(o.conversions)}</td><td class="num">${BRL(o.cpa)}</td></tr>`;
+  }).join("");
+
+  // daily series for charts
+  DAILY=dates.map(date=>{
+    const dr=rows.filter(r=>r.date===date), m=agg(dr.filter(r=>r.platform==="meta")), g=agg(dr.filter(r=>r.platform==="google")), all=agg(dr);
+    return{label:date.slice(5).replace("-","/"),Meta:+m.spend.toFixed(2),Google:+g.spend.toFixed(2),clicks:all.clicks,conversions:all.conversions,ctr:+(all.ctr*100).toFixed(2)};
+  });
+
+  // donut
+  document.getElementById("donutTotal").textContent=BRL0(total.spend);
+  document.getElementById("share").innerHTML=byP.map(p=>`<div class="r"><span><span class="dot" style="background:${p.p==="meta"?"var(--meta)":"var(--google)"}"></span>${p.p==="meta"?"Meta":"Google"}</span><span class="num" style="font-size:12.5px;color:var(--dim)">${BRL0(p.spend)} · ${PCT(p.share)}</span></div>`).join("");
+  drawDonut(byP);
+  drawTrend("clicks");
+}
+
+const METRICS={clicks:{label:"Clicks",color:"--mint",fmt:INT},conversions:{label:"Conversions",color:"--accent",fmt:INT},ctr:{label:"CTR %",color:"--mint",fmt:v=>v+"%"}};
+
+function drawTrend(metric){
+  const ctx=document.getElementById("trend"), mm=METRICS[metric];
+  document.getElementById("trendSub").textContent="vs. "+mm.label.toLowerCase()+" (line)";
+  const data={
+    labels:DAILY.map(d=>d.label),
+    datasets:[
+      {type:"bar",label:"Meta",data:DAILY.map(d=>d.Meta),backgroundColor:c("--meta"),stack:"s",yAxisID:"l",borderRadius:2,categoryPercentage:.7,barPercentage:.9},
+      {type:"bar",label:"Google",data:DAILY.map(d=>d.Google),backgroundColor:c("--google"),stack:"s",yAxisID:"l",borderRadius:2,categoryPercentage:.7,barPercentage:.9},
+      {type:"line",label:mm.label,data:DAILY.map(d=>d[metric]),borderColor:c(mm.color),backgroundColor:"transparent",borderWidth:2,pointRadius:0,tension:.35,yAxisID:"r"},
+    ],
+  };
+  const opts={
+    responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:"#0E1318",borderColor:c("--border"),borderWidth:1,titleColor:c("--dim"),bodyColor:c("--text"),bodyFont:{family:"IBM Plex Mono"},titleFont:{family:"IBM Plex Mono"},padding:10,callbacks:{label:i=>i.dataset.type==="bar"?` ${i.dataset.label}: ${BRL(i.raw)}`:` ${mm.label}: ${mm.fmt(i.raw)}`}}},
+    scales:{
+      x:{stacked:true,grid:{display:false},ticks:{color:c("--faint"),font:{family:"IBM Plex Mono",size:10},maxTicksLimit:10}},
+      l:{stacked:true,position:"left",grid:{color:c("--grid")},ticks:{color:c("--faint"),font:{family:"IBM Plex Mono",size:10},callback:v=>"R$"+v}},
+      r:{position:"right",grid:{display:false},ticks:{color:c("--faint"),font:{family:"IBM Plex Mono",size:10}}},
+    },
+  };
+  if(trendChart){trendChart.data=data;trendChart.options=opts;trendChart.update();}
+  else trendChart=new Chart(ctx,{data,options:opts});
+}
+
+function drawDonut(byP){
+  const ctx=document.getElementById("donut");
+  const cfg={
+    type:"doughnut",
+    data:{labels:["Meta","Google"],datasets:[{data:[byP[0].spend,byP[1].spend],backgroundColor:[c("--meta"),c("--google")],borderWidth:0,spacing:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"70%",plugins:{legend:{display:false},tooltip:{backgroundColor:"#0E1318",borderColor:c("--border"),borderWidth:1,bodyColor:c("--text"),bodyFont:{family:"IBM Plex Mono"},padding:10,callbacks:{label:i=>` ${i.label}: ${BRL(i.raw)}`}}}},
+  };
+  if(donutChart){donutChart.data=cfg.data;donutChart.update();}
+  else donutChart=new Chart(ctx,cfg);
+}
+
+document.getElementById("metricSegs").addEventListener("click",e=>{
+  const b=e.target.closest(".seg"); if(!b) return;
+  document.querySelectorAll("#metricSegs .seg").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); drawTrend(b.dataset.m);
+});
+
+function showEmpty(){
+  document.getElementById("dataView").style.display="none";
+  const ev=document.getElementById("emptyView");
+  ev.style.display="block";
+  ev.innerHTML=`<div class="panel" style="padding:34px 30px;text-align:center">
+    <div class="lbl" style="color:var(--mint);margin-bottom:12px">&#10003; Connected &middot; Live</div>
+    <div class="disp" style="font-size:22px;font-weight:700;margin-bottom:10px">No ad delivery yet</div>
+    <div class="num" style="color:var(--dim);font-size:13px;line-height:1.65;max-width:580px;margin:0 auto 22px">
+      The dashboard is connected to your live Supabase data. Your Google Ads campaigns are enabled but have recorded
+      <b style="color:var(--text)">0 impressions and R$0 spend</b> in the last 30 days, so there is nothing to chart yet.
+      This view fills in automatically once campaigns start delivering &mdash; the sync runs every day.
+    </div>
+    <button id="previewBtn" class="seg" style="font-size:12.5px;padding:9px 18px">Preview layout with sample data</button>
+  </div>`;
+  document.getElementById("previewBtn").addEventListener("click",()=>{
+    ev.style.display="none";
+    document.getElementById("dataView").style.display="block";
+    document.getElementById("modeBadge").textContent="Sample data";
+    document.getElementById("modeBadge").classList.remove("live");
+    render(sampleRows());
+  });
+}
+loadRows().then(rows=>{
+  if(LIVE && (!rows || rows.length===0)){ showEmpty(); return; }
+  render(rows);
+}).catch(err=>{
+  document.getElementById("modeBadge").textContent="Sample data";
+  document.getElementById("modeBadge").classList.remove("live");
+  document.getElementById("kpis").innerHTML=`<div class="panel kpi" style="grid-column:1/-1;color:var(--down)">Couldn't load live data (${err.message}). Showing sample.</div>`;
+  render(sampleRows());
+});
+</script>
+</body>
+</html>

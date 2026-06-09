@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+<script>window.Chart||document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"><\/script>')</script>
+<script>window.Chart||document.write('<script src="https://unpkg.com/chart.js@4.4.3/dist/chart.umd.min.js"><\/script>')</script>
 <style>
   :root{
     --meta:#4C8DFF; --google:#F4B740; --accent:#C2F24A; --mint:#7CF2D0;
@@ -383,11 +385,19 @@ function render(rows,isDemo){
   // donut
   document.getElementById("donutTotal").textContent=BRL0(total.spend);
   document.getElementById("share").innerHTML=byP.map(p=>`<div class="r"><span><span class="dot" style="background:${p.p==="meta"?"var(--meta)":"var(--google)"}"></span>${p.p==="meta"?"Meta":"Google"}</span><span class="num" style="font-size:12.5px;color:var(--dim)">${BRL0(p.spend)} · ${PCT(p.share)}</span></div>`).join("");
-  drawDonut(byP);
-  drawTrend(document.querySelector("#metricSegs .seg.on")?.dataset.m||"clicks");
+  if(typeof Chart!=="undefined"){
+    try{ drawDonut(byP); drawTrend(document.querySelector("#metricSegs .seg.on")?.dataset.m||"clicks"); }
+    catch(e){ chartFallback(); }
+  } else { chartFallback(); }
 }
 
 const METRICS={clicks:{label:"Clicks",color:"--mint",fmt:INT},conversions:{label:"Conversions",color:"--accent",fmt:INT},ctr:{label:"CTR %",color:"--mint",fmt:v=>v+"%"}};
+
+function chartFallback(){
+  const note='<div class="num" style="color:var(--faint);font-size:12px;text-align:center;padding:46px 14px;line-height:1.6">Charts unavailable — the Chart.js library was blocked by your browser or network.<br>All the numbers above are live and correct.</div>';
+  const cb=document.querySelector(".chartbox"); if(cb) cb.innerHTML=note;
+  const dw=document.querySelector(".donutwrap"); if(dw){ dw.style.height="auto"; dw.innerHTML=note; }
+}
 
 function drawTrend(metric){
   const ctx=document.getElementById("trend"), mm=METRICS[metric];
@@ -427,7 +437,7 @@ function drawDonut(byP){
 document.getElementById("metricSegs").addEventListener("click",e=>{
   const b=e.target.closest(".seg"); if(!b) return;
   document.querySelectorAll("#metricSegs .seg").forEach(x=>x.classList.remove("on"));
-  b.classList.add("on"); drawTrend(b.dataset.m);
+  b.classList.add("on"); if(typeof Chart!=="undefined") drawTrend(b.dataset.m);
 });
 
 // range selector -> reload live

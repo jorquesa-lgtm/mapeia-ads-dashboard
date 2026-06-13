@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+<script>window.Chart||document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.js">\x3C/script>')</script>
 <style>
   :root{
     --meta:#4C8DFF; --google:#F4B740; --accent:#C2F24A; --mint:#7CF2D0;
@@ -288,13 +289,13 @@ function render(rows){
   // donut
   document.getElementById("donutTotal").textContent=BRL0(total.spend);
   document.getElementById("share").innerHTML=byP.map(p=>`<div class="r"><span><span class="dot" style="background:${p.p==="meta"?"var(--meta)":"var(--google)"}"></span>${p.p==="meta"?"Meta":"Google"}</span><span class="num" style="font-size:12.5px;color:var(--dim)">${BRL0(p.spend)} · ${PCT(p.share)}</span></div>`).join("");
-  drawDonut(byP);
-  drawTrend("clicks");
+  try{ drawDonut(byP); drawTrend("clicks"); }catch(e){ console.warn("charts skipped:",e); }
 }
 
 const METRICS={clicks:{label:"Clicks",color:"--mint",fmt:INT},conversions:{label:"Conversions",color:"--accent",fmt:INT},ctr:{label:"CTR %",color:"--mint",fmt:v=>v+"%"}};
 
 function drawTrend(metric){
+  if(typeof Chart==="undefined") return;
   const ctx=document.getElementById("trend"), mm=METRICS[metric];
   document.getElementById("trendSub").textContent="vs. "+mm.label.toLowerCase()+" (line)";
   const data={
@@ -319,6 +320,7 @@ function drawTrend(metric){
 }
 
 function drawDonut(byP){
+  if(typeof Chart==="undefined") return;
   const ctx=document.getElementById("donut");
   const cfg={
     type:"doughnut",

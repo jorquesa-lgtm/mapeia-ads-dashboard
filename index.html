@@ -93,6 +93,7 @@
   .si-md li{margin:0 0 5px}
   .si-md strong{color:#fff;font-weight:600}
   .si-md code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px}
+  .rangebar{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 
   @media(max-width:1080px){
     .kpis{grid-template-columns:repeat(4,1fr)}
@@ -121,6 +122,14 @@
 
   <div id="emptyView" style="display:none"></div>
   <div id="dataView">
+  <div class="rangebar">
+    <span class="lbl">Período</span>
+    <div class="segs" id="rangeSegs">
+      <button class="seg on" data-d="7">7 dias</button>
+      <button class="seg" data-d="14">14 dias</button>
+      <button class="seg" data-d="30">30 dias</button>
+    </div>
+  </div>
   <div class="kpis" id="kpis"></div>
   <div class="foot">* "Conversions" são reportadas pelas plataformas. "Leads reais" são cadastros no seu banco (Supabase). "Landing views" = quem realmente carregou a página após o clique. CPA/CAC reais destravam com captura de UTM + receita.</div>
 
@@ -178,6 +187,8 @@ const CONFIG = {
   DATA_ENDPOINT:     "https://vaekdvwevooqrlubctoj.supabase.co/functions/v1/ads-dashboard-data",
   INSIGHTS_ENDPOINT: "https://vaekdvwevooqrlubctoj.supabase.co/functions/v1/smart-insights",
   ACCESS_TOKEN:      "mapeia_ads_dash_7f3a9c1e8b6d4205af19",
+  SUPABASE_KEY:      "sb_publishable_80fO4pk5-vQIyAh_DJywCQ_F-Y5eLP9",
+  DEFAULT_DAYS:      7,
 };
 
 // ---------- formatters ----------
@@ -211,12 +222,13 @@ function sampleRows(){
   }
   return rows;
 }
-let LIVE=false, META={};
+let LIVE=false, META={}, RANGE_DAYS=(CONFIG.DEFAULT_DAYS||7);
 async function loadRows(){
   if(CONFIG.DATA_ENDPOINT){
     const h={}; if(CONFIG.ACCESS_TOKEN) h.Authorization="Bearer "+CONFIG.ACCESS_TOKEN;
+    if(CONFIG.SUPABASE_KEY) h.apikey=CONFIG.SUPABASE_KEY;
     const sep=CONFIG.DATA_ENDPOINT.includes("?")?"&":"?";
-    const r=await fetch(CONFIG.DATA_ENDPOINT+sep+"v=2",{headers:h});
+    const r=await fetch(CONFIG.DATA_ENDPOINT+sep+"v=2&days="+RANGE_DAYS,{headers:h});
     if(!r.ok) throw new Error("Endpoint "+r.status);
     LIVE=true;
     document.getElementById("modeBadge").textContent="Live";
@@ -411,8 +423,9 @@ async function runInsights(){
   panel.innerHTML=`<div class="si-head"><div class="si-title">&#10024; Smart Insights</div><div class="si-meta">analisando dados mais recentes…</div></div><div class="si-body"><span class="si-spinner"></span>Lendo campanhas, calculando o funil e gerando recomendações com o Claude. Pode levar ~30s.</div>`;
   panel.scrollIntoView({behavior:"smooth",block:"nearest"});
   try{
-    const h={"Content-Type":"application/json"}; if(CONFIG.ACCESS_TOKEN) h.Authorization="Bearer "+CONFIG.ACCESS_TOKEN;
-    const r=await fetch(CONFIG.INSIGHTS_ENDPOINT,{method:"POST",headers:h,body:"{}"});
+    const h={"Content-Type":"application/json"}; if(CONFIG.ACCESS_TOKEN) h.Authorization="Bearer "+CONFIG.ACCESS_TOKEN; if(CONFIG.SUPABASE_KEY) h.apikey=CONFIG.SUPABASE_KEY;
+    const sep=CONFIG.INSIGHTS_ENDPOINT.includes("?")?"&":"?";
+    const r=await fetch(CONFIG.INSIGHTS_ENDPOINT+sep+"days="+RANGE_DAYS,{method:"POST",headers:h,body:"{}"});
     const j=await r.json();
     if(j.error){
       const msg=j.message||j.detail||j.error;
@@ -433,15 +446,40 @@ async function runInsights(){
 }
 const _siBtn=document.getElementById("siBtn"); if(_siBtn) _siBtn.addEventListener("click",runInsights);
 
-loadRows().then(rows=>{
-  if(LIVE && (!rows || rows.length===0)){ showEmpty(); return; }
-  render(rows);
-}).catch(err=>{
-  document.getElementById("modeBadge").textContent="Sample data";
+function showLoadError(err){
+  document.getElementById("emptyView").style.display="none";
+  document.getElementById("dataView").style.display="block";
+  document.getElementById("modeBadge").textContent="Offline";
   document.getElementById("modeBadge").classList.remove("live");
-  document.getElementById("kpis").innerHTML=`<div class="panel kpi" style="grid-column:1/-1;color:var(--down)">Couldn't load live data (${err.message}). Showing sample.</div>`;
-  render(sampleRows());
+  const msg=(err&&err.message)?err.message:String(err);
+  document.getElementById("kpis").innerHTML=
+    `<div class="panel" style="grid-column:1/-1;padding:26px;text-align:center">
+       <div class="disp" style="font-size:18px;font-weight:700;color:var(--down);margin-bottom:8px">Não consegui carregar os dados ao vivo</div>
+       <div class="num" style="color:var(--dim);font-size:13px;margin-bottom:18px">${siEsc(msg)} — confira a conexão ou recarregue a página (Ctrl/Cmd + Shift + R para limpar o cache).</div>
+       <button class="seg" id="retryBtn" style="font-size:12.5px;padding:9px 18px;margin-right:8px">Tentar de novo</button>
+       <button class="seg" id="sampleBtn" style="font-size:12.5px;padding:9px 18px">Ver layout de exemplo</button>
+     </div>`;
+  const rb=document.getElementById("retryBtn"); if(rb) rb.addEventListener("click",reloadData);
+  const sb=document.getElementById("sampleBtn"); if(sb) sb.addEventListener("click",()=>{
+    document.getElementById("modeBadge").textContent="Sample data";
+    render(sampleRows());
+  });
+}
+function reloadData(){
+  loadRows().then(rows=>{
+    if(LIVE && (!rows || rows.length===0)){ showEmpty(); return; }
+    render(rows);
+  }).catch(showLoadError);
+}
+const _rangeSegs=document.getElementById("rangeSegs");
+if(_rangeSegs) _rangeSegs.addEventListener("click",e=>{
+  const b=e.target.closest(".seg"); if(!b) return;
+  document.querySelectorAll("#rangeSegs .seg").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on");
+  RANGE_DAYS=parseInt(b.dataset.d,10)||7;
+  reloadData();
 });
+reloadData();
 </script>
 </body>
 </html>
